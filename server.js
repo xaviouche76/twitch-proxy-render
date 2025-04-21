@@ -3,7 +3,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 // 👇 Correction ici pour fetch
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,14 +15,12 @@ app.use((req, res, next) => {
   next();
 });
 
-
 app.get('/live', async (req, res) => {
   const streamers = req.query.users?.split(',') || [];
   const clientId = process.env.TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
 
   try {
-    // Get access token
     const tokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`, {
       method: 'POST'
     });
@@ -30,7 +28,6 @@ app.get('/live', async (req, res) => {
     const tokenData = await tokenRes.json();
     const accessToken = tokenData.access_token;
 
-    // Get stream info
     const query = streamers.map(s => `user_login=${s}`).join('&');
     const streamRes = await fetch(`https://api.twitch.tv/helix/streams?${query}`, {
       headers: {
@@ -41,6 +38,39 @@ app.get('/live', async (req, res) => {
 
     const streamData = await streamRes.json();
     res.json(streamData);
+
+  } catch (error) {
+    console.error('Erreur côté serveur :', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+});
+
+app.get('/users', async (req, res) => {
+  const { users } = req.query;
+  if (!users) return res.status(400).json({ error: 'users parameter missing' });
+
+  const clientId = process.env.TWITCH_CLIENT_ID;
+  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+
+  try {
+    const tokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`, {
+      method: 'POST'
+    });
+
+    const tokenData = await tokenRes.json();
+    const accessToken = tokenData.access_token;
+
+    const query = users.split(',').map(u => `login=${u}`).join('&');
+    const userRes = await fetch(`https://api.twitch.tv/helix/users?${query}`, {
+      headers: {
+        'Client-ID': clientId,
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    const userData = await userRes.json();
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.status(200).json(userData);
 
   } catch (error) {
     console.error('Erreur côté serveur :', error);

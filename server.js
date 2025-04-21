@@ -1,16 +1,20 @@
 const express = require('express');
-const fetch = require('node-fetch');
-require('dotenv').config();
+const dotenv = require('dotenv');
+dotenv.config();
+
+// 👇 Correction ici pour fetch
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ CORS Header
+// CORS
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*'); // autoriser tous les domaines
-  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
   next();
 });
+
 
 app.get('/live', async (req, res) => {
   const streamers = req.query.users?.split(',') || [];

@@ -99,13 +99,13 @@ app.post('/register-streamer', async (req, res) => {
       [twitch_id, display_name, description, profile_image_url]
     );
 
-    res.status(200).json({ message: 'Streamer enregistré avec succès' });
+    res.status(200).json({ message: 'Streamer enregistre avec succes' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erreur lors de l'enregistrement', details: err.message });
+    res.status(500).json({ error: 'Erreur lors de l\'enregistrement', details: err.message });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`Serveur proxy Twitch lancé sur le port ${PORT}`);
+  console.log(`Serveur proxy Twitch lance sur le port ${PORT}`);
 });

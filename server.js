@@ -85,24 +85,60 @@ app.get('/users', async (req, res) => {
   }
 });
 
-app.post('/register-streamer', async (req, res) => {
-  const { twitch_id, display_name, description, profile_image_url } = req.body;
-  if (!twitch_id) return res.status(400).json({ error: 'twitch_id is required' });
+// ** Nouvelle route pour l'authentification via Twitch **
+app.get('/auth-twitch', (req, res) => {
+  const redirectUri = process.env.TWITCH_REDIRECT_URI;  // Redirection après autorisation
+  const clientId = process.env.TWITCH_CLIENT_ID;
+  const scope = 'user:read:email';  // Demande de permissions ici
+
+  res.redirect(`https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`);
+});
+
+// ** Callback après que l'utilisateur ait autorisé l'accès via Twitch OAuth **
+app.get('/callback', async (req, res) => {
+  const { code } = req.query;  // Code d'autorisation reçu par Twitch
+
+  if (!code) return res.status(400).json({ error: 'Code d\'autorisation manquant' });
+
+  const clientId = process.env.TWITCH_CLIENT_ID;
+  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+  const redirectUri = process.env.TWITCH_REDIRECT_URI;
 
   try {
+    // Échanger le code contre un access token
+    const tokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&code=${code}&grant_type=authorization_code&redirect_uri=${redirectUri}`, {
+      method: 'POST'
+    });
+
+    const tokenData = await tokenRes.json();
+    const accessToken = tokenData.access_token;
+
+    // Utiliser l'access token pour récupérer les informations de l'utilisateur
+    const userRes = await fetch('https://api.twitch.tv/helix/users', {
+      headers: {
+        'Client-ID': clientId,
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    const userData = await userRes.json();
+    const { id, login, display_name, profile_image_url } = userData.data[0];
+
+    // Enregistrer ces informations dans la base de données
     await pool.query(
-      `INSERT INTO streamers (twitch_id, display_name, description, profile_image_url)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO streamers (twitch_id, display_name, profile_image_url)
+       VALUES ($1, $2, $3)
        ON CONFLICT (twitch_id) DO UPDATE SET display_name = EXCLUDED.display_name,
-                                              description = EXCLUDED.description,
                                               profile_image_url = EXCLUDED.profile_image_url`,
-      [twitch_id, display_name, description, profile_image_url]
+      [id, display_name, profile_image_url]
     );
 
-    res.status(200).json({ message: 'Streamer enregistre avec succes' });
+    // Rediriger vers la page de profil ou autre page de confirmation
+    res.redirect('/profile.html?user=' + login);
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erreur lors de l\'enregistrement', details: err.message });
+    res.status(500).json({ error: 'Erreur lors de l\'authentification', details: err.message });
   }
 });
 
@@ -114,7 +150,6 @@ app.get('/init-db', async (req, res) => {
         id SERIAL PRIMARY KEY,
         twitch_id VARCHAR(100) UNIQUE NOT NULL,
         display_name VARCHAR(100),
-        description TEXT,
         profile_image_url TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -127,5 +162,5 @@ app.get('/init-db', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Serveur proxy Twitch lance sur le port ${PORT}`);
+  console.log(`Serveur proxy Twitch lancé sur le port ${PORT}`);
 });

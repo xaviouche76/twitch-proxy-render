@@ -1,12 +1,21 @@
 const express = require('express');
 const dotenv = require('dotenv');
+const { Pool } = require('pg');
 dotenv.config();
 
+// 👇 Correction ici pour fetch
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
+app.use(express.json());
+
+// CORS
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', '*');
@@ -19,7 +28,10 @@ app.get('/live', async (req, res) => {
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
 
   try {
-    const tokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`, { method: 'POST' });
+    const tokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`, {
+      method: 'POST'
+    });
+
     const tokenData = await tokenRes.json();
     const accessToken = tokenData.access_token;
 
@@ -48,7 +60,10 @@ app.get('/users', async (req, res) => {
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
 
   try {
-    const tokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`, { method: 'POST' });
+    const tokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`, {
+      method: 'POST'
+    });
+
     const tokenData = await tokenRes.json();
     const accessToken = tokenData.access_token;
 
@@ -70,59 +85,24 @@ app.get('/users', async (req, res) => {
   }
 });
 
-app.get('/clips', async (req, res) => {
-  const { user_id } = req.query;
-  if (!user_id) return res.status(400).json({ error: 'user_id parameter missing' });
-
-  const clientId = process.env.TWITCH_CLIENT_ID;
-  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+app.post('/register-streamer', async (req, res) => {
+  const { twitch_id, display_name, description, profile_image_url } = req.body;
+  if (!twitch_id) return res.status(400).json({ error: 'twitch_id is required' });
 
   try {
-    const tokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`, { method: 'POST' });
-    const tokenData = await tokenRes.json();
-    const accessToken = tokenData.access_token;
+    await pool.query(
+      `INSERT INTO streamers (twitch_id, display_name, description, profile_image_url)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (twitch_id) DO UPDATE SET display_name = EXCLUDED.display_name,
+                                              description = EXCLUDED.description,
+                                              profile_image_url = EXCLUDED.profile_image_url`,
+      [twitch_id, display_name, description, profile_image_url]
+    );
 
-    const resClips = await fetch(`https://api.twitch.tv/helix/clips?broadcaster_id=${user_id}&first=1`, {
-      headers: {
-        'Client-ID': clientId,
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
-
-    const data = await resClips.json();
-    res.json(data);
-
-  } catch (error) {
-    console.error('Erreur clips :', error);
-    res.status(500).json({ error: 'Server error', details: error.message });
-  }
-});
-
-app.get('/vods', async (req, res) => {
-  const { user_id } = req.query;
-  if (!user_id) return res.status(400).json({ error: 'user_id parameter missing' });
-
-  const clientId = process.env.TWITCH_CLIENT_ID;
-  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-
-  try {
-    const tokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`, { method: 'POST' });
-    const tokenData = await tokenRes.json();
-    const accessToken = tokenData.access_token;
-
-    const resVods = await fetch(`https://api.twitch.tv/helix/videos?user_id=${user_id}&sort=views&type=archive&first=1`, {
-      headers: {
-        'Client-ID': clientId,
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
-
-    const data = await resVods.json();
-    res.json(data);
-
-  } catch (error) {
-    console.error('Erreur vods :', error);
-    res.status(500).json({ error: 'Server error', details: error.message });
+    res.status(200).json({ message: 'Streamer enregistré avec succès' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur lors de l'enregistrement', details: err.message });
   }
 });
 

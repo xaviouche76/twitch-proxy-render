@@ -128,8 +128,8 @@ app.get('/clips', async (req, res) => {
   }
 });
 
-// GET /videos?user_id=12345
-app.get('/videos', async (req, res) => {
+// Route pour récupérer les vidéos (VOD)
+app.get('/vods', async (req, res) => {
   const { user_id } = req.query;
   if (!user_id) return res.status(400).json({ error: 'user_id parameter missing' });
 

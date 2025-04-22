@@ -56,6 +56,36 @@ app.get('/users', async (req, res) => {
   }
 });
 
+app.get('/live', async (req, res) => {
+  const streamers = req.query.users?.split(',') || [];
+  const clientId = process.env.TWITCH_CLIENT_ID;
+  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+
+  try {
+    const tokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`, {
+      method: 'POST'
+    });
+
+    const tokenData = await tokenRes.json();
+    const accessToken = tokenData.access_token;
+
+    const query = streamers.map(s => `user_login=${s}`).join('&');
+    const streamRes = await fetch(`https://api.twitch.tv/helix/streams?${query}`, {
+      headers: {
+        'Client-ID': clientId,
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    const streamData = await streamRes.json();
+    res.json(streamData);  // Envoie la réponse JSON
+
+  } catch (error) {
+    console.error('Erreur côté serveur :', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+});
+
 // Route pour récupérer les clips du streamer
 app.get('/clips', async (req, res) => {
   const { user_id } = req.query;

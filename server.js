@@ -106,6 +106,26 @@ app.post('/register-streamer', async (req, res) => {
   }
 });
 
+// 🔧 Init de la table streamers si elle n'existe pas (utilisable une seule fois)
+app.get('/init-db', async (req, res) => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS streamers (
+        id SERIAL PRIMARY KEY,
+        twitch_id VARCHAR(100) UNIQUE NOT NULL,
+        display_name VARCHAR(100),
+        description TEXT,
+        profile_image_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    res.status(200).send('✅ Table streamers créée (ou déjà existante).');
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur lors de la création de la table', details: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Serveur proxy Twitch lance sur le port ${PORT}`);
 });

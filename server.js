@@ -70,34 +70,6 @@ app.get('/users', async (req, res) => {
   }
 });
 
-app.get('/followers', async (req, res) => {
-  const { to_id } = req.query;
-  if (!to_id) return res.status(400).json({ error: 'to_id parameter missing' });
-
-  const clientId = process.env.TWITCH_CLIENT_ID;
-  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-
-  try {
-    const tokenRes = await fetch(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`, { method: 'POST' });
-    const tokenData = await tokenRes.json();
-    const accessToken = tokenData.access_token;
-
-    const resFollow = await fetch(`https://api.twitch.tv/helix/users/follows?to_id=${to_id}`, {
-      headers: {
-        'Client-ID': clientId,
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
-
-    const data = await resFollow.json();
-    res.json({ total: data.total });
-
-  } catch (error) {
-    console.error('Erreur followers :', error);
-    res.status(500).json({ error: 'Server error', details: error.message });
-  }
-});
-
 app.get('/clips', async (req, res) => {
   const { user_id } = req.query;
   if (!user_id) return res.status(400).json({ error: 'user_id parameter missing' });
